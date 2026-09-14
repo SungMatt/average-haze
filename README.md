@@ -3,6 +3,8 @@
 Reports Singapore PSI over 24-hour, 48-hour, 7-day, 30-day and 365-day rolling
 windows, using NEA's own PM2.5 -> PSI conversion.
 
+**Live report: <https://sungmatt.github.io/average-haze/>** — rebuilt hourly.
+
 ## The conversion
 
 From NEA, [*Computation of the Pollutant Standards Index
@@ -40,7 +42,31 @@ python3 -m unittest test_haze          # 18 tests
 ```
 
 Hourly PM2.5 comes from the data.gov.sg real-time API, one day per request,
-cached under `data/cache/`.
+cached under `data/cache/`. The cache is committed, so a refresh only fetches
+the two days that can still change.
+
+## Hourly refresh
+
+`.github/workflows/refresh.yml` runs hourly:
+
+```
+python -m unittest test_haze     # conversion still matches NEA's example
+python -m haze.refresh           # refetch recent days, rebuild haze-report.html
+```
+
+then commits any changed readings and deploys the page to GitHub Pages.
+
+`haze.refresh` drops the last two cached days before fetching (today's entry is
+written while the day is still incomplete), rebuilds `haze-report.html` from
+`template.html`, and prunes cache files older than 375 days so a long-running
+schedule doesn't grow the repo without bound. Every figure in the page's prose
+is filled in from the data at load time, so the text can't drift out of step
+with the charts.
+
+Two caveats worth knowing. GitHub queues scheduled runs on a best-effort basis,
+so an hourly run can land late. And GitHub disables scheduled workflows after 60
+days without repository activity — bot commits don't reliably reset that clock,
+so the schedule may occasionally need a manual re-enable.
 
 ## Two averaging orders
 
