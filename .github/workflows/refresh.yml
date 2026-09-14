@@ -6,18 +6,27 @@ on:
     # a run can land late under load; the refresh is idempotent either way.
     - cron: "7 * * * *"
   workflow_dispatch:
+  push:
+    branches: [main]
 
-# One run at a time: two concurrent runs would race on the commit.
+# One run at a time: concurrent runs would race on both the commit and the
+# Pages deployment. Never cancel in progress -- a half-finished deploy would
+# leave the site on a partial build.
 concurrency:
   group: refresh
   cancel-in-progress: false
 
 permissions:
-  contents: write
+  contents: write   # commit refreshed readings back to the repo
+  pages: write      # deploy the rebuilt page
+  id-token: write   # OIDC token the Pages deploy authenticates with
 
 jobs:
   refresh:
     runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
 
@@ -44,3 +53,21 @@ jobs:
             git commit -m "Refresh haze data ($(date -u +'%Y-%m-%d %H:%M UTC'))"
             git push
           fi
+
+      # Pages serves index.html, so the report is published under that name.
+      - name: Stage the site
+        run: |
+          mkdir -p site
+          cp haze-report.html site/index.html
+
+      - uses: actions/configure-pages@v5
+        with:
+          enablement: true
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+      - name: Deploy to Pages
+        id: deploy
+        uses: actions/deploy-pages@v4
