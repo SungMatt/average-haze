@@ -1,0 +1,80 @@
+# average-haze
+
+Reports Singapore PSI over 24-hour, 48-hour, 7-day, 30-day and 365-day rolling
+windows, using NEA's own PM2.5 -> PSI conversion.
+
+## The conversion
+
+From NEA, [*Computation of the Pollutant Standards Index
+(PSI)*](https://www.haze.gov.sg/docs/default-source/faq/computation-of-the-pollutant-standards-index-(psi).pdf)
+(last updated March 2014). Each pollutant sub-index is a segmented linear
+function of concentration. For PM2.5 the published bands are:
+
+| PSI band  | 24-hr PM2.5 (µg/m³) |
+|-----------|---------------------|
+| 0 – 50    | 0 – 12    |
+| 51 – 100  | 13 – 55   |
+| 101 – 200 | 56 – 150  |
+| 201 – 300 | 151 – 250 |
+| 301 – 400 | 251 – 350 |
+| 401 – 500 | 351 – 500 |
+
+Within a segment, NEA Equation 1 interpolates linearly:
+
+```
+Ii = (Ii,j+1 - Ii,j) / (Xi,j+1 - Xi,j) × (Xi - Xi,j) + Ii,j
+```
+
+The overall PSI is the maximum of the six pollutant sub-indices. This tool
+computes the PM2.5 sub-index only, which is the binding one during haze.
+
+Verified against NEA's worked example: 40 µg/m³ → 83.
+
+## Running it
+
+```
+python3 -m haze.report                 # worst region each hour
+python3 -m haze.report --region north  # a single region
+python3 -m haze.report --json
+python3 -m unittest test_haze          # 18 tests
+```
+
+Hourly PM2.5 comes from the data.gov.sg real-time API, one day per request,
+cached under `data/cache/`.
+
+## Two averaging orders
+
+Averaging and the PSI transform do not commute, so both are reported:
+
+- **concentration-first** — mean the PM2.5 over the window, then convert once.
+  The direct generalisation of NEA's method to a longer window.
+- **index-first** — mean the 24-hour PSI values NEA would have published at
+  each hour. "The average of what was reported."
+
+The transform is concave: its first segment runs at 4.17 index points per
+µg/m³, the 55–150 segment at 1.05, the 350–500 segment at 0.67. By Jensen's
+inequality `f(mean(x)) ≥ mean(f(x))`, so index-first always reads at or below
+concentration-first, and the gap grows with the spread inside the window.
+
+## What the long windows actually do
+
+They do not measure current air quality, and nothing here should be published
+as though they do.
+
+A rolling mean is a low-pass filter. Haze in Singapore arrives as episodes
+lasting days to weeks against a clean baseline, which is exactly the signal a
+long window removes. Widening the window from 24 hours to 365 days divides a
+one-week episode's contribution by roughly 52 — an episode can sit at
+Hazardous throughout while the annual mean stays in the Good band. The number
+gets lower because the averaging discarded the event, not because the air was
+clean. `test_long_window_hides_a_spike` pins that behaviour down: 30 clean days
+plus a 3-day Hazardous episode reports "Moderate".
+
+The 365-day mean is a real and useful statistic for chronic exposure, which is
+what long-term PM2.5 health effects track, and it is worth reporting for that.
+It is the wrong instrument for "should I go outside today", and the 24-hour
+window is already criticised for the same reason on a smaller scale.
+
+So the report prints, next to every window: the worst 24-hour PSI inside it,
+the peak 1-hour PM2.5, and the number of hours above PSI 100. A window average
+is only honest when shown with the peaks it smoothed away.

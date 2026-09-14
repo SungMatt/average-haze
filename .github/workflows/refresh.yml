@@ -1,0 +1,46 @@
+name: Refresh haze report
+
+on:
+  schedule:
+    # Hourly at :07. GitHub queues scheduled runs on a best-effort basis, so
+    # a run can land late under load; the refresh is idempotent either way.
+    - cron: "7 * * * *"
+  workflow_dispatch:
+
+# One run at a time: two concurrent runs would race on the commit.
+concurrency:
+  group: refresh
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Run tests
+        run: python -m unittest test_haze
+
+      # The committed cache holds the past year, so this fetches only the two
+      # days that can still change -- about two API calls per run.
+      - name: Refresh data and rebuild page
+        run: python -m haze.refresh
+
+      - name: Commit if the data moved
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/cache data/chart.json haze-report.html
+          if git diff --staged --quiet; then
+            echo "No change in readings; nothing to commit."
+          else
+            git commit -m "Refresh haze data ($(date -u +'%Y-%m-%d %H:%M UTC'))"
+            git push
+          fi

@@ -1,0 +1,641 @@
+<title>The Averaging Ladder</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Condensed:wght@600;700&family=IBM+Plex+Sans:wght@400;500&display=swap">
+<style>
+:root {
+  color-scheme: light;
+  --ground:    #ececeb;
+  --surface:   #fbfbfa;
+  --ink:       #101012;
+  --ink-2:     #4e4e52;
+  --muted:     #82828a;
+  --rule:      #dcdcda;
+  --grid:      #e4e4e1;
+  --ring:      rgba(16,16,18,0.11);
+  --signal:    #eb6834;
+  --signal-fill: rgba(235,104,52,0.10);
+  --zone:      rgba(235,104,52,0.055);
+  --avg-1:     #86b6ef;
+  --avg-2:     #5598e7;
+  --avg-3:     #2a78d6;
+  --avg-4:     #1c5cab;
+  --avg-5:     #104281;
+  --good:      #0ca30c;
+  --crit:      #d03b3b;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --ground:  #0e0f10;
+    --surface: #141416;
+    --ink:     #f5f5f3;
+    --ink-2:   #b7b7b2;
+    --muted:   #8a8a90;
+    --rule:    #2b2c2f;
+    --grid:    #232427;
+    --ring:    rgba(255,255,255,0.12);
+    --signal:  #d95926;
+    --signal-fill: rgba(217,89,38,0.14);
+    --zone:    rgba(217,89,38,0.07);
+    --avg-1:   #184f95;
+    --avg-2:   #256abf;
+    --avg-3:   #3987e5;
+    --avg-4:   #6da7ec;
+    --avg-5:   #9ec5f4;
+    --good:    #0ca30c;
+    --crit:    #e06a6a;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --ground:  #0e0f10;
+  --surface: #141416;
+  --ink:     #f5f5f3;
+  --ink-2:   #b7b7b2;
+  --muted:   #8a8a90;
+  --rule:    #2b2c2f;
+  --grid:    #232427;
+  --ring:    rgba(255,255,255,0.12);
+  --signal:  #d95926;
+  --signal-fill: rgba(217,89,38,0.14);
+  --zone:    rgba(217,89,38,0.07);
+  --avg-1:   #184f95;
+  --avg-2:   #256abf;
+  --avg-3:   #3987e5;
+  --avg-4:   #6da7ec;
+  --avg-5:   #9ec5f4;
+  --good:    #0ca30c;
+  --crit:    #e06a6a;
+}
+
+* { box-sizing: border-box; }
+body {
+  background: var(--ground);
+  color: var(--ink);
+  font: 400 16px/1.6 "IBM Plex Sans", system-ui, -apple-system, sans-serif;
+  margin: 0;
+  padding-block: 40px 72px;
+  padding-left: 20px;
+  padding-right: 20px;
+  -webkit-font-smoothing: antialiased;
+}
+.wrap { max-width: 1040px; margin: 0 auto; }
+
+h1, h2, h3 { font-family: "IBM Plex Sans Condensed", "IBM Plex Sans", sans-serif; text-wrap: balance; margin: 0; }
+h1 { font-weight: 700; font-size: clamp(2rem, 5.5vw, 3.1rem); line-height: 1.05; letter-spacing: -0.015em; }
+h2 { font-weight: 700; font-size: clamp(1.3rem, 3vw, 1.6rem); line-height: 1.15; letter-spacing: -0.01em; }
+h3 { font-weight: 600; font-size: 1.02rem; line-height: 1.25; }
+
+.eyebrow {
+  font: 500 0.7rem/1.4 "IBM Plex Mono", ui-monospace, monospace;
+  letter-spacing: 0.16em; text-transform: uppercase; color: var(--muted);
+}
+.lede { font-size: clamp(1.02rem, 2.1vw, 1.16rem); color: var(--ink-2); max-width: 62ch; }
+p { margin: 0; }
+.prose { display: flex; flex-direction: column; gap: 14px; max-width: 68ch; }
+.prose p { color: var(--ink-2); }
+strong { font-weight: 500; color: var(--ink); }
+
+header { display: flex; flex-direction: column; gap: 16px; }
+header .meta {
+  font: 400 0.76rem/1.5 "IBM Plex Mono", ui-monospace, monospace;
+  color: var(--muted); display: flex; flex-wrap: wrap; gap: 6px 18px;
+}
+section { margin-top: 60px; display: flex; flex-direction: column; gap: 20px; }
+.head { display: flex; flex-direction: column; gap: 9px; }
+
+/* ---- the contradiction ---- */
+.verdict {
+  margin-top: 36px;
+  display: grid; grid-template-columns: 1fr auto 1fr; gap: 4px;
+  align-items: stretch;
+  background: var(--surface);
+  border: 1px solid var(--ring); border-radius: 3px;
+  overflow: hidden;
+}
+.verdict > .col { padding: 26px 24px; display: flex; flex-direction: column; gap: 7px; }
+.verdict .vs {
+  align-self: center; padding: 0 4px;
+  font: 500 0.68rem/1 "IBM Plex Mono", monospace; letter-spacing: 0.12em;
+  color: var(--muted); text-transform: uppercase;
+}
+.verdict .sep { width: 1px; background: var(--rule); }
+.fig {
+  font: 400 clamp(3rem, 9vw, 4.4rem)/0.9 "IBM Plex Sans Condensed", sans-serif;
+  font-weight: 700; letter-spacing: -0.02em;
+}
+.fig.hot { color: var(--signal); }
+.fig.cool { color: var(--avg-3); }
+.band { font: 500 0.82rem/1 "IBM Plex Mono", monospace; letter-spacing: 0.04em; }
+.band.hot { color: var(--signal); }
+.band.cool { color: var(--avg-3); }
+.cap { font-size: 0.87rem; color: var(--ink-2); }
+.cap-mono { font: 400 0.75rem/1.5 "IBM Plex Mono", monospace; color: var(--muted); }
+
+/* ---- chart panels ---- */
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--ring); border-radius: 3px;
+  padding: 22px 22px 16px;
+  display: flex; flex-direction: column; gap: 16px;
+}
+.panel-head { display: flex; flex-wrap: wrap; gap: 10px 26px; align-items: baseline; justify-content: space-between; }
+.legend { display: flex; flex-wrap: wrap; gap: 8px 20px; align-items: center; }
+.key { display: flex; align-items: center; gap: 8px; font: 400 0.79rem/1 "IBM Plex Mono", monospace; color: var(--ink-2); }
+.key i { display: block; width: 16px; height: 0; border-top-width: 2px; border-top-style: solid; flex: none; }
+.chart-scroll { overflow-x: auto; }
+svg { display: block; width: 100%; height: auto; max-width: 100%; overflow: visible; }
+text { font-family: "IBM Plex Mono", ui-monospace, monospace; }
+
+/* ---- ladder table ---- */
+.tbl-scroll { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-size: 0.86rem; min-width: 520px; }
+caption { text-align: left; font: 400 0.78rem/1.5 "IBM Plex Mono", monospace; color: var(--muted); padding-bottom: 10px; }
+th, td { padding: 9px 12px 9px 0; text-align: right; border-bottom: 1px solid var(--rule); }
+th:first-child, td:first-child { text-align: left; }
+thead th {
+  font: 500 0.68rem/1.3 "IBM Plex Mono", monospace; letter-spacing: 0.08em;
+  text-transform: uppercase; color: var(--muted); white-space: nowrap;
+}
+tbody td { font-variant-numeric: tabular-nums; font-family: "IBM Plex Mono", monospace; color: var(--ink-2); }
+tbody td:first-child { font-family: "IBM Plex Sans", sans-serif; color: var(--ink); white-space: nowrap; }
+tbody tr[data-std] td { color: var(--ink); }
+tbody tr:last-child td { border-bottom: none; }
+.pill {
+  display: inline-block; padding: 2px 8px; border-radius: 2px;
+  font: 500 0.7rem/1.5 "IBM Plex Mono", monospace; letter-spacing: 0.03em;
+}
+.pill.unhealthy { color: var(--signal); box-shadow: inset 0 0 0 1px currentColor; }
+.pill.moderate { color: var(--ink-2); box-shadow: inset 0 0 0 1px var(--rule); }
+
+/* ---- who meter ---- */
+.who { display: grid; grid-template-columns: minmax(0,1fr); gap: 22px; }
+.who-fig { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 14px; }
+.who-fig .n { font: 700 clamp(2.4rem,7vw,3.4rem)/0.9 "IBM Plex Sans Condensed", sans-serif; color: var(--crit); letter-spacing: -0.02em; }
+.who-fig .u { font: 400 0.85rem/1 "IBM Plex Mono", monospace; color: var(--muted); }
+.who-fig .x { font: 500 0.9rem/1 "IBM Plex Mono", monospace; color: var(--crit); }
+
+/* ---- notes ---- */
+.notes { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 2px; background: var(--rule); border: 1px solid var(--ring); border-radius: 3px; overflow: hidden; }
+.note { background: var(--surface); padding: 19px 20px; display: flex; flex-direction: column; gap: 7px; }
+.note p { font-size: 0.86rem; color: var(--ink-2); }
+.note .eyebrow { color: var(--muted); }
+code {
+  font: 400 0.83em/1.5 "IBM Plex Mono", monospace;
+  background: color-mix(in srgb, var(--ink) 7%, transparent);
+  padding: 1px 5px; border-radius: 2px;
+}
+a { color: var(--avg-3); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+footer { margin-top: 56px; padding-top: 20px; border-top: 1px solid var(--rule); }
+footer p { font: 400 0.78rem/1.6 "IBM Plex Mono", monospace; color: var(--muted); }
+
+/* ---- tooltip ---- */
+.tip {
+  position: fixed; z-index: 20; pointer-events: none; opacity: 0;
+  transition: opacity .1s linear;
+  background: var(--surface); color: var(--ink);
+  border: 1px solid var(--ring); border-radius: 3px;
+  box-shadow: 0 4px 14px rgba(0,0,0,0.14);
+  padding: 9px 11px; min-width: 132px;
+  font: 400 0.78rem/1.5 "IBM Plex Mono", monospace;
+}
+.tip .d { color: var(--muted); }
+.tip .v { font-size: 1.06rem; font-weight: 500; }
+.tip.on { opacity: 1; }
+
+@media (max-width: 620px) {
+  .verdict { grid-template-columns: 1fr; }
+  .verdict .sep { width: auto; height: 1px; }
+  .verdict .vs { padding: 0 24px 4px; align-self: start; }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+:focus-visible { outline: 2px solid var(--signal); outline-offset: 2px; }
+</style>
+
+<div class="wrap">
+  <header>
+    <p class="eyebrow">PM2.5 &rarr; PSI &middot; rolling windows &middot; worst reporting region</p>
+    <h1>The Averaging Ladder</h1>
+    <p class="lede">
+      Singapore reports air quality as a 24-hour average. Widen that window and the
+      published number falls &mdash; <span id="l-hi">&mdash;</span> to <span id="l-lo">&mdash;</span> &mdash;
+      while the air does not change at all.
+      Here is a year of real readings put through NEA's own conversion.
+    </p>
+    <div class="meta">
+      <span id="m-window"></span>
+      <span id="m-readings"></span>
+      <span>Source: data.gov.sg &middot; NEA</span>
+    </div>
+  </header>
+
+  <div class="verdict">
+    <div class="col">
+      <p class="eyebrow">24-hour window &mdash; as published</p>
+      <p class="fig hot" id="v-24">&mdash;</p>
+      <p class="band hot" id="v-24-band">&mdash;</p>
+      <p class="cap">What NEA's method reports for the day ending now.</p>
+    </div>
+    <div class="sep"></div>
+    <p class="vs">same air</p>
+    <div class="sep"></div>
+    <div class="col">
+      <p class="eyebrow">365-day window &mdash; our &ldquo;improvement&rdquo;</p>
+      <p class="fig cool" id="v-365">&mdash;</p>
+      <p class="band cool" id="v-365-band">&mdash;</p>
+      <p class="cap">The same conversion over a year. Lower &mdash; and meaningless as a reading of today.</p>
+    </div>
+  </div>
+
+  <section>
+    <div class="head">
+      <h2>A year of the number NEA actually publishes</h2>
+      <p class="prose">The orange line is the 24-hour PSI, recomputed hour by hour for the last
+      365 days. The flat blue rules are the 30-day and 365-day averages of that same data.
+      Every hour the line sits above a rule is an hour the wider window is discarding.</p>
+    </div>
+    <div class="panel">
+      <div class="panel-head">
+        <h3>24-hour PSI, hourly &mdash; <span id="yr-range" class="cap-mono"></span></h3>
+        <div class="legend">
+          <span class="key"><i style="border-color:var(--signal)"></i>24-hour PSI</span>
+          <span class="key"><i style="border-color:var(--avg-4);border-top-style:dashed"></i>30-day avg</span>
+          <span class="key"><i style="border-color:var(--avg-5);border-top-style:dashed"></i>365-day avg</span>
+        </div>
+      </div>
+      <div class="chart-scroll"><svg id="year" viewBox="0 0 1000 330" role="img"
+        aria-label="Hourly 24-hour PSI across one year, with flat 30-day and 365-day average lines well below the peaks."></svg></div>
+      <p class="cap-mono">Sampled every 6 hours. The series is already a 24-hour mean, so it carries no sub-daily detail to lose.</p>
+    </div>
+  </section>
+
+  <section>
+    <div class="head">
+      <h2>The last fortnight, hour by hour</h2>
+      <p class="prose">Close up on the episode running now. The 24-hour line crosses into
+      Unhealthy and stays there &mdash; the event that the 365-day average dilutes to
+      <span id="l-share">&mdash;</span> of its window.</p>
+    </div>
+    <div class="panel">
+      <div class="panel-head">
+        <h3>24-hour PSI, hourly &mdash; <span id="rc-range" class="cap-mono"></span></h3>
+        <div class="legend">
+          <span class="key"><i style="border-color:var(--signal)"></i>24-hour PSI</span>
+        </div>
+      </div>
+      <div class="chart-scroll"><svg id="recent" viewBox="0 0 1000 210" role="img"
+        aria-label="Hourly 24-hour PSI over the last 14 days, crossing the Unhealthy threshold of 100."></svg></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="head">
+      <h2>Climbing the ladder</h2>
+      <p class="prose">Five windows, same conversion, same data, all ending at the same instant.
+      The bars are the PSI each window reports; the marker is the Unhealthy threshold
+      the 24-hour window crosses and the others do not.</p>
+    </div>
+    <div class="panel">
+      <div class="panel-head"><h3>Reported PSI by window length</h3></div>
+      <div class="chart-scroll"><svg id="ladder" viewBox="0 0 1000 250" role="img"
+        aria-label="Horizontal bars of reported PSI by window length, falling from 114 at 24 hours to 61 at 365 days."></svg></div>
+    </div>
+    <div class="panel">
+      <div class="tbl-scroll">
+        <table>
+          <caption>Every window, and the peaks each one smooths away.</caption>
+          <thead><tr>
+            <th>Window</th><th>Mean PM2.5</th><th>PSI</th><th>Band</th>
+            <th>Worst 24h PSI inside</th><th>Hours &gt; 100</th>
+          </tr></thead>
+          <tbody id="tbl"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="head">
+      <h2>Read against the right benchmark, the long window is the bad news</h2>
+      <p class="prose">PSI bands are defined for 24-hour exposure. Scoring an annual mean
+      against them is a category error &mdash; a year-long average belongs against an annual
+      guideline. Against WHO's, Singapore's actual annual mean does not look reassuring at all.</p>
+    </div>
+    <div class="panel who">
+      <div class="who-fig">
+        <span class="n" id="who-n">&mdash;</span>
+        <span class="u">&micro;g/m&sup3; annual mean PM2.5</span>
+        <span class="x" id="who-x"></span>
+      </div>
+      <div class="chart-scroll"><svg id="meter" viewBox="0 0 1000 120" role="img"
+        aria-label="Meter of annual mean PM2.5 at 21.4 against WHO guideline 5 and interim targets 10, 15, 25 and 35."></svg></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="head"><h2>Method</h2></div>
+    <div class="notes">
+      <div class="note">
+        <p class="eyebrow">The conversion</p>
+        <p>NEA's PM2.5 sub-index is a segmented linear function with breakpoints at
+        <code>(0,0) (12,50) (55,100) (150,200) (250,300) (350,400) (500,500)</code>,
+        interpolated by their Equation 1. Verified against NEA's own worked example:
+        40&nbsp;&micro;g/m&sup3; &rarr; 83.</p>
+      </div>
+      <div class="note">
+        <p class="eyebrow">Two averaging orders</p>
+        <p>PSI is concave &mdash; 4.17 index points per &micro;g/m&sup3; on the first segment,
+        0.67 on the last. By Jensen's inequality averaging the <em>published index</em> lands
+        at or below averaging the concentrations, shaving another 23 points off the
+        24-hour figure. Both orders are computed.</p>
+      </div>
+      <div class="note">
+        <p class="eyebrow">Why the number falls</p>
+        <p>A rolling mean is a low-pass filter, and haze arrives as episodes lasting days
+        against a clean baseline &mdash; precisely the signal a long window removes. The
+        figure drops because the averaging discarded the event, not because the air cleared.</p>
+      </div>
+      <div class="note">
+        <p class="eyebrow">What it cannot do</p>
+        <p>Reach &ldquo;safe&rdquo;. The Good band needs a mean at or under
+        12&nbsp;&micro;g/m&sup3;; the real annual mean is <span id="l-ann">&mdash;</span>. No window length available
+        produces that claim &mdash; the ladder bottoms out at Moderate.</p>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <p>Hourly PM2.5 from the data.gov.sg real-time API, worst of the five reporting
+    regions each hour. Conversion per NEA, <em>Computation of the Pollutant Standards
+    Index</em>, March 2014. Benchmarks from the WHO Global Air Quality Guidelines, 2021.
+    Long-window averages on this page describe chronic exposure and must not be read
+    as current conditions.</p>
+  </footer>
+</div>
+
+<div class="tip" id="tip" role="status" aria-live="polite"></div>
+
+<script id="data" type="application/json">__DATA__</script>
+<script>
+(function () {
+  var D = JSON.parse(document.getElementById('data').textContent);
+  var SVGNS = 'http://www.w3.org/2000/svg';
+
+  // Presentation attributes don't resolve var(), so paint goes through inline
+  // style and the charts repaint themselves when the viewer flips theme.
+  // Everything style-bound is routed here: setAttribute('style', ...) would
+  // replace the whole declaration and silently drop the fill, which leaves an
+  // SVG shape at its default fill of black.
+  var STYLE_PROPS = { fill: 1, stroke: 1, cursor: 1 };
+  function el(tag, attrs, text) {
+    var n = document.createElementNS(SVGNS, tag);
+    for (var k in attrs) {
+      if (attrs[k] === null || attrs[k] === undefined) continue;
+      if (STYLE_PROPS[k]) n.style.setProperty(k, attrs[k]);
+      else n.setAttribute(k, attrs[k]);
+    }
+    if (text !== undefined) n.textContent = text;
+    return n;
+  }
+  var win = {};
+  D.windows.forEach(function (w) { win[w.label] = w; });
+
+  /* ---------------- header + verdict ---------------- */
+  document.getElementById('m-window').textContent = D.yearStart + ' — ' + D.yearEnd;
+  document.getElementById('m-readings').textContent = D.totalReadings.toLocaleString() + ' hourly readings';
+  document.getElementById('yr-range').textContent = D.yearStart + ' → ' + D.yearEnd;
+  document.getElementById('v-24').textContent = win['24-hour'].psi;
+  document.getElementById('v-24-band').textContent = win['24-hour'].band;
+  document.getElementById('v-365').textContent = win['365-day'].psi;
+  document.getElementById('v-365-band').textContent = win['365-day'].band;
+  document.getElementById('l-hi').textContent = win['24-hour'].psi;
+  document.getElementById('l-lo').textContent = win['365-day'].psi;
+  document.getElementById('l-share').textContent = win['365-day'].unhealthyShare + '%';
+  document.getElementById('l-ann').textContent = D.annualMeanPm25;
+  document.getElementById('year').setAttribute('aria-label',
+    'Hourly 24-hour PSI across one year, peaking at ' + Math.round(D.peakRolled)
+    + ' and never falling below ' + Math.round(D.minRolled)
+    + ', with flat 30-day and 365-day average lines well below the peaks.');
+
+  /* ---------------- shared line-chart builder ---------------- */
+  function lineChart(opts) {
+    var svg = document.getElementById(opts.id);
+    while (svg.firstChild) svg.removeChild(svg.firstChild);
+    var W = opts.W, H = opts.H, P = opts.pad;
+    var vals = opts.values;
+    var x0 = P.l, x1 = W - P.r, y0 = P.t, y1 = H - P.b;
+    var yMax = opts.yMax, yMin = 0;
+    var sx = function (i) { return x0 + (x1 - x0) * (i / (vals.length - 1)); };
+    var sy = function (v) { return y1 - (y1 - y0) * ((v - yMin) / (yMax - yMin)); };
+
+    // Unhealthy zone tint (PSI > 100)
+    if (yMax > 100) {
+      svg.appendChild(el('rect', { x: x0, y: sy(yMax), width: x1 - x0, height: sy(100) - sy(yMax), fill: 'var(--zone)' }));
+    }
+    // gridlines + y labels
+    opts.ticks.forEach(function (t) {
+      svg.appendChild(el('line', { x1: x0, x2: x1, y1: sy(t), y2: sy(t), stroke: 'var(--grid)', 'stroke-width': 1 }));
+      svg.appendChild(el('text', { x: x0 - 9, y: sy(t) + 4, 'text-anchor': 'end', fill: 'var(--muted)', 'font-size': 11 }, t));
+    });
+    // PSI band threshold rules at 50 / 100
+    [[50, 'Good │ Moderate'], [100, 'Moderate │ Unhealthy']].forEach(function (b) {
+      if (b[0] > yMax) return;
+      svg.appendChild(el('line', { x1: x0, x2: x1, y1: sy(b[0]), y2: sy(b[0]),
+        stroke: 'var(--muted)', 'stroke-width': 1, 'stroke-dasharray': '1 3', opacity: 0.85 }));
+      if (opts.bandLabels) {
+        svg.appendChild(el('text', { x: x1 - 4, y: sy(b[0]) - 6, 'text-anchor': 'end',
+          fill: 'var(--muted)', 'font-size': 10, 'letter-spacing': '0.05em' }, b[1]));
+      }
+    });
+    // baseline + x labels
+    svg.appendChild(el('line', { x1: x0, x2: x1, y1: y1, y2: y1, stroke: 'var(--rule)', 'stroke-width': 1 }));
+    opts.xTicks.forEach(function (t) {
+      if (t.i > vals.length - 1) return;
+      svg.appendChild(el('text', { x: sx(t.i), y: y1 + 18, 'text-anchor': 'middle', fill: 'var(--muted)', 'font-size': 11 }, t.label));
+    });
+
+    // area + line
+    var d = '', a = 'M' + sx(0).toFixed(1) + ' ' + y1.toFixed(1);
+    vals.forEach(function (v, i) {
+      var px = sx(i).toFixed(1), py = sy(v).toFixed(1);
+      d += (i ? 'L' : 'M') + px + ' ' + py;
+      a += 'L' + px + ' ' + py;
+    });
+    a += 'L' + sx(vals.length - 1).toFixed(1) + ' ' + y1.toFixed(1) + 'Z';
+    svg.appendChild(el('path', { d: a, fill: 'var(--signal-fill)', stroke: 'none' }));
+    svg.appendChild(el('path', { d: d, fill: 'none', stroke: 'var(--signal)',
+      'stroke-width': 2, 'stroke-linejoin': 'round', 'stroke-linecap': 'round' }));
+
+    // flat window-average rules, direct-labelled in the right gutter
+    (opts.refs || []).forEach(function (r) {
+      svg.appendChild(el('line', { x1: x0, x2: x1, y1: sy(r.v), y2: sy(r.v),
+        stroke: r.color, 'stroke-width': 2, 'stroke-dasharray': '7 5' }));
+      svg.appendChild(el('text', { x: x1 + 8, y: sy(r.v) + 4, fill: r.color, 'font-size': 12, 'font-weight': 500 }, r.v));
+      svg.appendChild(el('text', { x: x1 + 8, y: sy(r.v) + 18, fill: 'var(--muted)', 'font-size': 9.5, 'letter-spacing': '0.06em' }, r.tag));
+    });
+
+    // hover layer: crosshair + tooltip
+    var tip = document.getElementById('tip');
+    var cross = el('line', { y1: y0, y2: y1, stroke: 'var(--ink-2)', 'stroke-width': 1, opacity: 0 });
+    var dot = el('circle', { r: 4.5, fill: 'var(--signal)', stroke: 'var(--surface)', 'stroke-width': 2, opacity: 0 });
+    svg.appendChild(cross); svg.appendChild(dot);
+    var hit = el('rect', { x: x0, y: y0, width: x1 - x0, height: y1 - y0, fill: 'transparent', cursor: 'crosshair' });
+    svg.appendChild(hit);
+
+    function show(ev) {
+      var r = svg.getBoundingClientRect();
+      var fx = (ev.clientX - r.left) / r.width * W;
+      var i = Math.round((fx - x0) / (x1 - x0) * (vals.length - 1));
+      i = Math.max(0, Math.min(vals.length - 1, i));
+      var v = vals[i];
+      cross.setAttribute('x1', sx(i)); cross.setAttribute('x2', sx(i)); cross.setAttribute('opacity', 0.28);
+      dot.setAttribute('cx', sx(i)); dot.setAttribute('cy', sy(v)); dot.setAttribute('opacity', 1);
+      tip.innerHTML = '<div class="d">' + opts.label(i) + '</div><div class="v">PSI ' + Math.round(v)
+        + '</div><div class="d">' + opts.bandOf(v) + '</div>';
+      tip.classList.add('on');
+      var tw = tip.offsetWidth, th = tip.offsetHeight;
+      var left = Math.min(Math.max(8, ev.clientX - tw / 2), window.innerWidth - tw - 8);
+      var top = ev.clientY - th - 14;
+      if (top < 8) top = ev.clientY + 18;
+      tip.style.left = left + 'px'; tip.style.top = top + 'px';
+    }
+    function hide() {
+      cross.setAttribute('opacity', 0); dot.setAttribute('opacity', 0); tip.classList.remove('on');
+    }
+    hit.addEventListener('pointermove', show);
+    hit.addEventListener('pointerdown', show);
+    hit.addEventListener('pointerleave', hide);
+  }
+
+  // Keep the tallest peak clear of the plot ceiling as readings climb.
+  function headroom(vals) {
+    return Math.max(140, Math.ceil((Math.max.apply(null, vals) * 1.12) / 20) * 20);
+  }
+
+  function bandOf(v) {
+    v = Math.round(v);
+    return v <= 50 ? 'Good' : v <= 100 ? 'Moderate' : v <= 200 ? 'Unhealthy' : 'Very Unhealthy';
+  }
+  var MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  function stamp(iso, stepH, i) {
+    var d = new Date(iso); d.setHours(d.getHours() + stepH * i);
+    return d.getDate() + ' ' + MON[d.getMonth()] + ' ' + d.getFullYear();
+  }
+  function stampH(iso, i) {
+    var d = new Date(iso); d.setHours(d.getHours() + i);
+    var hh = ('0' + d.getHours()).slice(-2);
+    return d.getDate() + ' ' + MON[d.getMonth()] + ', ' + hh + ':00';
+  }
+
+  lineChart({
+    id: 'year', W: 1000, H: 330, pad: { l: 40, r: 62, t: 18, b: 30 },
+    values: D.psi, yMax: headroom(D.psi), ticks: [0, 50, 100],
+    xTicks: D.months, bandLabels: true,
+    refs: [
+      { v: win['30-day'].psi, color: 'var(--avg-4)', tag: '30-DAY' },
+      { v: win['365-day'].psi, color: 'var(--avg-5)', tag: '365-DAY' }
+    ],
+    label: function (i) { return stamp(D.t0, D.stepHours, i); },
+    bandOf: bandOf
+  });
+
+  document.getElementById('rc-range').textContent =
+    stamp(D.recentT0, 1, 0) + ' → ' + D.yearEnd;
+  lineChart({
+    id: 'recent', W: 1000, H: 210, pad: { l: 40, r: 62, t: 16, b: 28 },
+    values: D.recent, yMax: headroom(D.recent), ticks: [0, 50, 100],
+    xTicks: D.recentDays, bandLabels: false,
+    refs: [{ v: win['30-day'].psi, color: 'var(--avg-4)', tag: '30-DAY' }],
+    label: function (i) { return stampH(D.recentT0, i); },
+    bandOf: bandOf
+  });
+
+  /* ---------------- ladder ---------------- */
+  (function () {
+    var svg = document.getElementById('ladder');
+    var W = 1000, H = 250, L = 108, R = 92, T = 14, B = 34;
+    var rows = D.windows, n = rows.length;
+    var xMax = 130;
+    var sx = function (v) { return L + (W - R - L) * (v / xMax); };
+    var rowH = (H - T - B) / n, bh = 18;
+    var ramp = ['--avg-1', '--avg-2', '--avg-3', '--avg-4', '--avg-5'];
+
+    [0, 50, 100].forEach(function (t) {
+      svg.appendChild(el('line', { x1: sx(t), x2: sx(t), y1: T, y2: H - B, stroke: 'var(--grid)', 'stroke-width': 1 }));
+      svg.appendChild(el('text', { x: sx(t), y: H - B + 18, 'text-anchor': 'middle', fill: 'var(--muted)', 'font-size': 11 }, t));
+    });
+    // Unhealthy threshold marker
+    svg.appendChild(el('line', { x1: sx(100), x2: sx(100), y1: T - 2, y2: H - B,
+      stroke: 'var(--signal)', 'stroke-width': 1.5, 'stroke-dasharray': '4 4' }));
+    svg.appendChild(el('text', { x: sx(100) + 7, y: T + 9, fill: 'var(--signal)', 'font-size': 10,
+      'letter-spacing': '0.06em' }, 'UNHEALTHY →'));
+
+    rows.forEach(function (w, i) {
+      var cy = T + rowH * i + rowH / 2;
+      var over = w.psi > 100;
+      svg.appendChild(el('text', { x: L - 12, y: cy + 4, 'text-anchor': 'end',
+        fill: 'var(--ink)', 'font-size': 12.5, 'font-weight': w.isStandard ? 500 : 400 }, w.label));
+      // 4px rounded data-end, anchored to the baseline at zero
+      svg.appendChild(el('rect', { x: sx(0), y: cy - bh / 2, width: Math.max(2, sx(w.psi) - sx(0)),
+        height: bh, rx: 4, fill: over ? 'var(--signal)' : 'var(' + ramp[i] + ')' }));
+      svg.appendChild(el('text', { x: sx(w.psi) + 10, y: cy + 4,
+        fill: over ? 'var(--signal)' : 'var(--ink)', 'font-size': 13, 'font-weight': 500 }, w.psi));
+      svg.appendChild(el('text', { x: sx(w.psi) + 42, y: cy + 4,
+        fill: 'var(--muted)', 'font-size': 10.5, 'letter-spacing': '0.05em' }, w.band));
+    });
+    svg.appendChild(el('line', { x1: sx(0), x2: sx(0), y1: T, y2: H - B, stroke: 'var(--rule)', 'stroke-width': 1 }));
+  })();
+
+  /* ---------------- table ---------------- */
+  (function () {
+    var tb = document.getElementById('tbl');
+    D.windows.forEach(function (w) {
+      var tr = document.createElement('tr');
+      if (w.isStandard) tr.setAttribute('data-std', '');
+      var pill = '<span class="pill ' + (w.psi > 100 ? 'unhealthy' : 'moderate') + '">' + w.band + '</span>';
+      tr.innerHTML = '<td>' + w.label + (w.isStandard ? ' · NEA' : '') + '</td>'
+        + '<td>' + w.meanPm25.toFixed(1) + '</td>'
+        + '<td>' + w.psi + '</td>'
+        + '<td>' + pill + '</td>'
+        + '<td>' + w.worst24h + ' <span style="color:var(--muted)">' + w.worstAt + '</span></td>'
+        + '<td>' + w.unhealthyHours + ' <span style="color:var(--muted)">(' + w.unhealthyShare + '%)</span></td>';
+      tb.appendChild(tr);
+    });
+  })();
+
+  /* ---------------- WHO meter ---------------- */
+  (function () {
+    var svg = document.getElementById('meter');
+    var W = 1000, H = 120, L = 12, R = 12, y = 52, h = 22;
+    var xMax = 40;
+    var sx = function (v) { return L + (W - R - L) * (v / xMax); };
+    var actual = D.annualMeanPm25;
+    document.getElementById('who-n').textContent = actual;
+    document.getElementById('who-x').textContent = '→ ' + (actual / 5).toFixed(1) + '× the WHO annual guideline';
+
+    // track
+    svg.appendChild(el('rect', { x: sx(0), y: y, width: sx(xMax) - sx(0), height: h, rx: 3, fill: 'var(--grid)' }));
+    // filled portion, same-hue ramp
+    svg.appendChild(el('rect', { x: sx(0), y: y, width: sx(actual) - sx(0), height: h, rx: 3, fill: 'var(--avg-3)' }));
+    // guideline ticks
+    [[5, 'AQG', 'guideline'], [10, 'IT-4', ''], [15, 'IT-3', ''], [25, 'IT-2', ''], [35, 'IT-1', '']].forEach(function (t) {
+      svg.appendChild(el('line', { x1: sx(t[0]), x2: sx(t[0]), y1: y - 11, y2: y + h + 11,
+        stroke: t[0] === 5 ? 'var(--good)' : 'var(--muted)', 'stroke-width': t[0] === 5 ? 2 : 1 }));
+      svg.appendChild(el('text', { x: sx(t[0]), y: y - 17, 'text-anchor': 'middle',
+        fill: t[0] === 5 ? 'var(--good)' : 'var(--muted)', 'font-size': 10.5,
+        'font-weight': t[0] === 5 ? 500 : 400, 'letter-spacing': '0.05em' }, t[1]));
+      svg.appendChild(el('text', { x: sx(t[0]), y: y + h + 24, 'text-anchor': 'middle',
+        fill: 'var(--muted)', 'font-size': 10 }, t[0]));
+    });
+    // actual marker, 2px surface ring so it reads over the track
+    svg.appendChild(el('line', { x1: sx(actual), x2: sx(actual), y1: y - 6, y2: y + h + 6,
+      stroke: 'var(--surface)', 'stroke-width': 6 }));
+    svg.appendChild(el('line', { x1: sx(actual), x2: sx(actual), y1: y - 6, y2: y + h + 6,
+      stroke: 'var(--crit)', 'stroke-width': 2.5 }));
+    svg.appendChild(el('text', { x: sx(actual) + 9, y: y + h + 24, fill: 'var(--crit)',
+      'font-size': 11, 'font-weight': 500 }, actual + ' actual'));
+    svg.appendChild(el('text', { x: sx(xMax), y: y + h + 24, 'text-anchor': 'end',
+      fill: 'var(--muted)', 'font-size': 10 }, 'µg/m³'));
+  })();
+})();
+</script>
