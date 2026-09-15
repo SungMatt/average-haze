@@ -4,6 +4,7 @@ Reports Singapore PSI over 24-hour, 48-hour, 7-day, 30-day and 365-day rolling
 windows, using NEA's own PM2.5 -> PSI conversion.
 
 **Live report: <https://sungmatt.github.io/average-haze/>** — rebuilt hourly.
+**Region by region: <https://sungmatt.github.io/average-haze/regions.html>**
 
 ## The conversion
 
@@ -38,7 +39,7 @@ Verified against NEA's worked example: 40 µg/m³ → 83.
 python3 -m haze.report                 # worst region each hour
 python3 -m haze.report --region north  # a single region
 python3 -m haze.report --json
-python3 -m unittest test_haze          # 18 tests
+python3 -m unittest test_haze          # 27 tests
 ```
 
 Hourly PM2.5 comes from the data.gov.sg real-time API, one day per request,
@@ -58,7 +59,8 @@ then commits any changed readings and deploys the page to GitHub Pages.
 
 `haze.refresh` drops the last two cached days before fetching (today's entry is
 written while the day is still incomplete), rebuilds `haze-report.html` from
-`template.html`, and prunes cache files older than 375 days so a long-running
+`template.html` and `regions.html` from `map-template.html`, and prunes cache
+files older than 375 days so a long-running
 schedule doesn't grow the repo without bound. Every figure in the page's prose
 is filled in from the data at load time, so the text can't drift out of step
 with the charts.
@@ -67,6 +69,36 @@ Two caveats worth knowing. GitHub queues scheduled runs on a best-effort basis,
 so an hourly run can land late. And GitHub disables scheduled workflows after 60
 days without repository activity — bot commits don't reliably reset that clock,
 so the schedule may occasionally need a manual re-enable.
+
+## The region map
+
+`regions.html` puts the same conversion on a map of Singapore, one card per NEA
+reporting region, each showing 365-day, 30-day, 7-day, 24-hour and 1-hour
+levels on a shared scale. Selecting a window recolours the map; the choice is
+kept in the URL hash (`regions.html#365d`) so a view is a shareable link.
+
+Two things about it are worth stating plainly.
+
+**The 1-hour number is a PSI-equivalent, not a PSI.** NEA's PM2.5 band table is
+defined for a 24-hour average. Pushing a single hourly reading through it
+answers "how bad is the air right now" and must not be quoted against a
+published PSI.
+
+**The region shapes are a reconstruction.** NEA publishes no boundary file for
+its five reporting regions — the API gives one label point each. `tools/build_map.py`
+takes those five points, builds their Voronoi partition (every place belongs to
+the reporting point nearest it), and clips it to an OpenStreetMap-derived
+coastline. That reproduces the cross-shaped arrangement NEA's own map uses
+without inventing borders, but the borders are approximate and the page says so.
+`test_region_areas_sum_to_the_coastline` checks the cells tile the island with
+no gaps or overlaps.
+
+The script runs once and its output is committed as `data/map.json`, so the
+hourly refresh never touches the network for geometry:
+
+```
+python3 tools/build_map.py
+```
 
 ## Two averaging orders
 
