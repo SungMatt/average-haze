@@ -46,7 +46,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add data/cache data/chart.json haze-report.html
+          git add data/cache data/chart.json haze-report.html regions.html
           if git diff --staged --quiet; then
             echo "No change in readings; nothing to commit."
           else
@@ -55,10 +55,14 @@ jobs:
           fi
 
       # Pages serves index.html, so the report is published under that name.
+      # It is also copied under its own name so the map page's back link
+      # resolves identically on Pages and when the files are opened locally.
       - name: Stage the site
         run: |
           mkdir -p site
           cp haze-report.html site/index.html
+          cp haze-report.html site/haze-report.html
+          cp regions.html site/regions.html
 
       - uses: actions/configure-pages@v5
         with:

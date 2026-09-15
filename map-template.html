@@ -1,0 +1,692 @@
+<title>Five Regions, One Ladder</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Condensed:wght@600;700&family=IBM+Plex+Sans:wght@400;500&display=swap">
+<style>
+:root {
+  color-scheme: light;
+  --ground:    #ececeb;
+  --surface:   #fbfbfa;
+  --ink:       #101012;
+  --ink-2:     #4e4e52;
+  --muted:     #82828a;
+  --rule:      #dcdcda;
+  --ring:      rgba(16,16,18,0.11);
+  --signal:    #eb6834;
+  --sea:       #e3e3e1;
+  /* PSI band ramp: semantic heat, monotone in lightness (OKLCH L .90 -> .39)
+     so the order survives greyscale and colour-vision deficiency. Every fill
+     also carries its number and band name, so colour is never the only cue. */
+  --b-base:    #eaf4e2;
+  --b0:        #cfe8b8;   /* Good            0-50  */
+  --b1:        #f3c53f;   /* Moderate       51-100 */
+  --b2:        #ef8b52;   /* Unhealthy     101-200 */
+  --b3:        #d0433f;   /* Very Unhealthy 201-300 */
+  --b4:        #7c1d2f;   /* Hazardous      301+   */
+  --on-band:   #101012;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --ground:  #0e0f10;
+    --surface: #141416;
+    --ink:     #f5f5f3;
+    --ink-2:   #b7b7b2;
+    --muted:   #8a8a90;
+    --rule:    #2b2c2f;
+    --ring:    rgba(255,255,255,0.12);
+    --signal:  #d95926;
+    --sea:     #1c1d20;
+    --b-base:  #6f9c66;
+    --b0:      #9bcf8c;
+    --b1:      #ddb03c;
+    --b2:      #d9784a;
+    --b3:      #c33f3f;
+    --b4:      #8d2438;
+    --on-band: #0e0f10;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --ground:  #0e0f10;
+  --surface: #141416;
+  --ink:     #f5f5f3;
+  --ink-2:   #b7b7b2;
+  --muted:   #8a8a90;
+  --rule:    #2b2c2f;
+  --ring:    rgba(255,255,255,0.12);
+  --signal:  #d95926;
+  --sea:     #1c1d20;
+  --b-base:  #6f9c66;
+  --b0:      #9bcf8c;
+  --b1:      #ddb03c;
+  --b2:      #d9784a;
+  --b3:      #c33f3f;
+  --b4:      #8d2438;
+  --on-band: #0e0f10;
+}
+
+* { box-sizing: border-box; }
+body {
+  background: var(--ground);
+  color: var(--ink);
+  font: 400 16px/1.6 "IBM Plex Sans", system-ui, -apple-system, sans-serif;
+  margin: 0;
+  padding-block: 40px 72px;
+  padding-left: 20px;
+  padding-right: 20px;
+  -webkit-font-smoothing: antialiased;
+}
+.wrap { max-width: 1040px; margin: 0 auto; }
+
+h1, h2, h3 { font-family: "IBM Plex Sans Condensed", "IBM Plex Sans", sans-serif; text-wrap: balance; margin: 0; }
+h1 { font-weight: 700; font-size: clamp(2rem, 5.5vw, 3.1rem); line-height: 1.05; letter-spacing: -0.015em; }
+h2 { font-weight: 700; font-size: clamp(1.3rem, 3vw, 1.6rem); line-height: 1.15; letter-spacing: -0.01em; }
+h3 { font-weight: 600; font-size: 1.02rem; line-height: 1.25; }
+
+.eyebrow {
+  font: 500 0.7rem/1.4 "IBM Plex Mono", ui-monospace, monospace;
+  letter-spacing: 0.16em; text-transform: uppercase; color: var(--muted);
+}
+.lede { font-size: clamp(1.02rem, 2.1vw, 1.16rem); color: var(--ink-2); max-width: 62ch; }
+p { margin: 0; }
+.prose { display: flex; flex-direction: column; gap: 14px; max-width: 68ch; }
+.prose p { color: var(--ink-2); }
+strong { font-weight: 500; color: var(--ink); }
+.cap { font-size: 0.87rem; color: var(--ink-2); }
+.cap-mono { font: 400 0.75rem/1.5 "IBM Plex Mono", monospace; color: var(--muted); }
+
+header { display: flex; flex-direction: column; gap: 16px; }
+header .meta {
+  font: 400 0.76rem/1.5 "IBM Plex Mono", ui-monospace, monospace;
+  color: var(--muted); display: flex; flex-wrap: wrap; gap: 6px 18px;
+}
+section { margin-top: 56px; display: flex; flex-direction: column; gap: 20px; }
+.head { display: flex; flex-direction: column; gap: 9px; }
+
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--ring); border-radius: 3px;
+  padding: 22px 22px 18px;
+  display: flex; flex-direction: column; gap: 18px;
+}
+.panel-head { display: flex; flex-wrap: wrap; gap: 10px 26px; align-items: baseline; justify-content: space-between; }
+svg { display: block; width: 100%; height: auto; max-width: 100%; }
+text { font-family: "IBM Plex Mono", ui-monospace, monospace; }
+
+/* ---- window selector ---- */
+.filters { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; }
+.filters .eyebrow { flex: none; }
+.segs { display: flex; flex-wrap: wrap; gap: 2px; background: var(--rule); border: 1px solid var(--ring); border-radius: 3px; padding: 2px; }
+.seg {
+  appearance: none; border: 0; cursor: pointer;
+  background: var(--surface); color: var(--ink-2);
+  font: 500 0.78rem/1 "IBM Plex Mono", monospace;
+  padding: 9px 13px; border-radius: 2px;
+}
+.seg[aria-pressed="true"] { background: var(--ink); color: var(--surface); }
+.seg:hover:not([aria-pressed="true"]) { color: var(--ink); }
+
+/* ---- map ---- */
+.map-wrap { position: relative; }
+.rgn { stroke: var(--surface); stroke-width: 2; stroke-linejoin: round; cursor: pointer; transition: opacity .12s linear; }
+.map-wrap.dim .rgn:not(.on) { opacity: 0.38; }
+.plaque { fill: var(--surface); stroke: var(--ring); stroke-width: 1; }
+.p-name { font: 500 15px/1 "IBM Plex Mono", monospace; fill: var(--muted); letter-spacing: 0.1em; }
+.p-val  { font: 700 30px/1 "IBM Plex Sans Condensed", sans-serif; fill: var(--ink); }
+.p-band { font: 400 12px/1 "IBM Plex Mono", monospace; fill: var(--ink-2); }
+
+.scale { display: flex; flex-direction: column; gap: 7px; }
+.scale-bar { display: flex; height: 10px; border-radius: 2px; overflow: hidden; gap: 2px; }
+.scale-bar span { flex: 1 1 0; }
+.scale-ticks { display: flex; font: 400 0.7rem/1 "IBM Plex Mono", monospace; color: var(--muted); }
+.scale-ticks span { flex: 1 1 0; display: flex; flex-direction: column; gap: 3px; padding-right: 8px; }
+.scale-ticks b { font-weight: 400; color: var(--ink-2); }
+
+/* ---- region cards ---- */
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(310px, 1fr)); gap: 16px; }
+.card {
+  background: var(--surface); border: 1px solid var(--ring); border-radius: 3px;
+  padding: 18px 18px 14px; display: flex; flex-direction: column; gap: 16px;
+  transition: box-shadow .12s linear;
+}
+.card.on { box-shadow: 0 0 0 2px var(--signal); }
+.card-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.chip {
+  font: 500 0.68rem/1.5 "IBM Plex Mono", monospace; letter-spacing: 0.05em;
+  padding: 2px 8px; border-radius: 2px; color: var(--on-band); white-space: nowrap;
+}
+.ladder { display: flex; align-items: flex-end; gap: 6px; --figh: 2.1rem; }
+.step { flex: 1 1 0; display: flex; flex-direction: column; align-items: center; gap: 6px; min-width: 0; cursor: default; }
+.step .v {
+  /* Every figure shares one baseline, so the emphasised three read as larger
+     type rather than as a ragged row. */
+  height: var(--figh); display: flex; align-items: flex-end;
+  font: 700 1.24rem/1 "IBM Plex Sans Condensed", sans-serif; color: var(--ink-2);
+  font-variant-numeric: tabular-nums;
+}
+.step.big .v { font-size: var(--figh); color: var(--ink); }
+.track { width: 100%; height: 78px; display: flex; align-items: flex-end; justify-content: center; }
+.bar { width: 60%; max-width: 30px; border-radius: 4px 4px 0 0; min-height: 3px; }
+.step.big .bar { width: 76%; }
+.step .w {
+  font: 400 0.63rem/1.3 "IBM Plex Mono", monospace; color: var(--muted);
+  letter-spacing: 0.04em; text-align: center;
+}
+.step.sel .w { color: var(--ink); }
+.step.sel .track { box-shadow: inset 0 -2px 0 0 var(--signal); }
+.spark { display: flex; flex-direction: column; gap: 5px; }
+.spark svg { height: 34px; }
+.card-foot { font: 400 0.72rem/1.5 "IBM Plex Mono", monospace; color: var(--muted); }
+.card-foot b { font-weight: 500; color: var(--ink-2); }
+
+/* ---- table ---- */
+.tbl-scroll { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-size: 0.86rem; min-width: 620px; }
+caption { text-align: left; font: 400 0.78rem/1.5 "IBM Plex Mono", monospace; color: var(--muted); padding-bottom: 10px; }
+th, td { padding: 9px 12px 9px 0; text-align: right; border-bottom: 1px solid var(--rule); }
+th:first-child, td:first-child { text-align: left; }
+thead th {
+  font: 500 0.68rem/1.3 "IBM Plex Mono", monospace; letter-spacing: 0.08em;
+  text-transform: uppercase; color: var(--muted); white-space: nowrap;
+}
+tbody td { font-variant-numeric: tabular-nums; font-family: "IBM Plex Mono", monospace; color: var(--ink-2); }
+tbody td:first-child { font-family: "IBM Plex Sans", sans-serif; color: var(--ink); white-space: nowrap; }
+tbody tr:last-child td { border-bottom: none; }
+td .sw { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 7px; vertical-align: baseline; }
+
+/* ---- notes ---- */
+.notes { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 2px; background: var(--rule); border: 1px solid var(--ring); border-radius: 3px; overflow: hidden; }
+.note { background: var(--surface); padding: 19px 20px; display: flex; flex-direction: column; gap: 7px; }
+.note p { font-size: 0.86rem; color: var(--ink-2); }
+.note .eyebrow { color: var(--muted); }
+code {
+  font: 400 0.83em/1.5 "IBM Plex Mono", monospace;
+  background: color-mix(in srgb, var(--ink) 7%, transparent);
+  padding: 1px 5px; border-radius: 2px;
+}
+a { color: var(--signal); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+footer { margin-top: 56px; padding-top: 20px; border-top: 1px solid var(--rule); }
+footer p { font: 400 0.78rem/1.6 "IBM Plex Mono", monospace; color: var(--muted); }
+footer p + p { margin-top: 10px; }
+
+.tip {
+  position: fixed; z-index: 20; pointer-events: none; opacity: 0;
+  transition: opacity .1s linear;
+  background: var(--surface); color: var(--ink);
+  border: 1px solid var(--ring); border-radius: 3px;
+  box-shadow: 0 4px 14px rgba(0,0,0,0.14);
+  padding: 9px 11px; min-width: 150px;
+  font: 400 0.78rem/1.5 "IBM Plex Mono", monospace;
+}
+.tip .d { color: var(--muted); }
+.tip .v { font-size: 1.06rem; font-weight: 500; }
+.tip.on { opacity: 1; }
+
+@media (max-width: 560px) {
+  .ladder { --figh: 1.6rem; gap: 4px; }
+  .step .v { font-size: 1rem; }
+  .track { height: 62px; }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+:focus-visible { outline: 2px solid var(--signal); outline-offset: 2px; }
+</style>
+
+<div class="wrap">
+  <header>
+    <p class="eyebrow">PM2.5 &rarr; PSI &middot; five NEA reporting regions &middot; five windows</p>
+    <h1>Five Regions, One Ladder</h1>
+    <p class="lede">
+      NEA measures PM2.5 separately for the north, south, east, west and central
+      regions. Every region climbs the same ladder &mdash; the wider the averaging
+      window, the smaller the number &mdash; but they do not start from the same rung.
+      Right now <strong id="l-worst">&mdash;</strong> is worst and
+      <strong id="l-clean">&mdash;</strong> cleanest, <span id="l-spread">&mdash;</span> apart
+      on the 24-hour reading.
+    </p>
+    <div class="meta">
+      <span id="m-gen"></span>
+      <span>Source: data.gov.sg &middot; NEA</span>
+      <span><a href="haze-report.html">&larr; The Averaging Ladder</a></span>
+    </div>
+  </header>
+
+  <section>
+    <div class="head">
+      <h2>The map</h2>
+      <p class="prose">Each region is shaded by the PSI its own readings produce over the
+      window you choose. Switch the window and watch the whole island cool down
+      without a breath of air changing.</p>
+    </div>
+
+    <div class="panel">
+      <div class="filters">
+        <span class="eyebrow">Averaging window</span>
+        <div class="segs" id="segs" role="group" aria-label="Averaging window"></div>
+      </div>
+      <div class="map-wrap" id="map-wrap">
+        <svg id="map" role="img" aria-labelledby="map-title"></svg>
+        <span id="map-title" hidden></span>
+      </div>
+      <div class="scale">
+        <p class="eyebrow">PSI band</p>
+        <div class="scale-bar" id="scale-bar"></div>
+        <div class="scale-ticks" id="scale-ticks"></div>
+      </div>
+      <p class="cap-mono">NEA publishes no boundary file for its five reporting regions &mdash;
+      only one label point each. The shapes above are the Voronoi partition of those
+      five points clipped to Singapore's coastline: every place is shaded by the
+      reporting point nearest it. Treat the borders as approximate.</p>
+    </div>
+  </section>
+
+  <section>
+    <div class="head">
+      <h2>The cards</h2>
+      <p class="prose">Five windows per region, all ending at the same instant, all on one
+      shared scale so the cards can be read against each other. The bars are the PSI each
+      window reports. The 1-hour, 24-hour and 365-day figures are set large: the
+      first is the air you are breathing, the second is what NEA publishes, the third is
+      what you have actually been living in.</p>
+    </div>
+    <div class="cards" id="cards"></div>
+  </section>
+
+  <section>
+    <div class="head">
+      <h2>Every number</h2>
+    </div>
+    <div class="panel">
+      <div class="tbl-scroll">
+        <table>
+          <caption>PSI by region and window, and the peaks the long windows smooth away.</caption>
+          <thead><tr id="thead-row"></tr></thead>
+          <tbody id="tbl"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="head"><h2>Method</h2></div>
+    <div class="notes">
+      <div class="note">
+        <p class="eyebrow">The 1-hour number</p>
+        <p>NEA's PM2.5 band table is defined for a <em>24-hour</em> average. Putting a single
+        hourly reading through it gives a PSI-<em>equivalent</em>, not a PSI. It is the right
+        number for &ldquo;how bad is it outside right now&rdquo; and the wrong number to quote
+        against a published PSI.</p>
+      </div>
+      <div class="note">
+        <p class="eyebrow">Why the bars fall</p>
+        <p>A rolling mean is a low-pass filter. Haze arrives as episodes lasting days against a
+        clean baseline &mdash; exactly the signal a long window removes. The 365-day bar is
+        lower because the averaging discarded the episode, not because the air cleared.</p>
+      </div>
+      <div class="note">
+        <p class="eyebrow">The conversion</p>
+        <p>Segmented linear, NEA Equation 1, breakpoints
+        <code>(0,0) (12,50) (55,100) (150,200) (250,300) (350,400) (500,500)</code>.
+        Verified against NEA's own worked example: 40&nbsp;&micro;g/m&sup3; &rarr; 83.</p>
+      </div>
+      <div class="note">
+        <p class="eyebrow">Gaps</p>
+        <p>Regions drop out during instrument downtime. Each window reports its coverage &mdash;
+        the share of its hours that actually carry a reading &mdash; in the tooltip, and a
+        window is averaged over the hours it has rather than assuming zero for the rest.</p>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <p>Hourly PM2.5 from the data.gov.sg real-time API, per region. Conversion per NEA,
+    <em>Computation of the Pollutant Standards Index</em>, March 2014. Region shapes are a
+    Voronoi reconstruction from NEA's published label points over an OpenStreetMap-derived
+    coastline, not an official boundary.</p>
+    <p>Long-window averages on this page describe chronic exposure and must not be read as
+    current conditions.</p>
+  </footer>
+</div>
+
+<div class="tip" id="tip" role="status" aria-live="polite"></div>
+
+<script id="data" type="application/json">__DATA__</script>
+<script>
+(function () {
+  var D = JSON.parse(document.getElementById('data').textContent);
+  var SVGNS = 'http://www.w3.org/2000/svg';
+
+  // Presentation attributes don't resolve var(), so paint goes through inline
+  // style and the map repaints itself when the viewer flips theme.
+  var STYLE_PROPS = { fill: 1, stroke: 1, cursor: 1 };
+  function el(tag, attrs, text) {
+    var n = document.createElementNS(SVGNS, tag);
+    for (var k in attrs) {
+      if (attrs[k] === null || attrs[k] === undefined) continue;
+      if (STYLE_PROPS[k]) n.style.setProperty(k, attrs[k]);
+      else n.setAttribute(k, attrs[k]);
+    }
+    if (text !== undefined) n.textContent = text;
+    return n;
+  }
+
+  /* ---------------- the band ramp ---------------- */
+  // Bands are NEA's. Within a band the fill slides from a 60/40 mix with the
+  // band below to the band's own anchor at its top, so two regions in the same
+  // band still read apart; the step at each boundary stays visible.
+  var BANDS = [
+    { lo: 0,   hi: 50,  name: 'Good',           v: '--b0', under: '--b-base' },
+    { lo: 51,  hi: 100, name: 'Moderate',       v: '--b1', under: '--b0' },
+    { lo: 101, hi: 200, name: 'Unhealthy',      v: '--b2', under: '--b1' },
+    { lo: 201, hi: 300, name: 'Very Unhealthy', v: '--b3', under: '--b2' },
+    { lo: 301, hi: 500, name: 'Hazardous',      v: '--b4', under: '--b3' }
+  ];
+
+  function bandOf(psi) {
+    for (var i = BANDS.length - 1; i >= 0; i--) if (psi >= BANDS[i].lo) return BANDS[i];
+    return BANDS[0];
+  }
+  function fillFor(psi) {
+    var b = bandOf(psi);
+    var t = Math.max(0, Math.min(1, (psi - b.lo) / (b.hi - b.lo)));
+    var pct = Math.round(60 + 40 * t);
+    return 'color-mix(in oklab, var(' + b.v + ') ' + pct + '%, var(' + b.under + '))';
+  }
+
+  var REG = {};
+  D.regions.forEach(function (r) { REG[r.key] = r; });
+  var WINDOWS = D.windows;
+  var KEYS = WINDOWS.map(function (w) { return w.key; });
+  // The window lives in the hash so a particular view is a shareable link.
+  var fromHash = location.hash.replace('#', '');
+  var selected = KEYS.indexOf(fromHash) >= 0 ? fromHash : '24h';
+
+  // One scale across every card, so a bar in one card means what it means in
+  // the next. Rounded up to a clean step above the largest number on the page.
+  var maxPsi = 0;
+  D.regions.forEach(function (r) {
+    WINDOWS.forEach(function (w) {
+      var s = r.windows[w.key];
+      if (s && s.psi > maxPsi) maxPsi = s.psi;
+    });
+  });
+  var scaleTop = Math.max(100, Math.ceil(maxPsi / 25) * 25);
+
+  /* ---------------- header ---------------- */
+  document.getElementById('m-gen').textContent = 'Latest reading ' + D.generated + ' SGT';
+  document.getElementById('l-worst').textContent = D.worst;
+  document.getElementById('l-clean').textContent = D.cleanest;
+  document.getElementById('l-spread').textContent = D.spread24h + ' PSI points';
+
+  /* ---------------- tooltip ---------------- */
+  var tip = document.getElementById('tip');
+  function showTip(evt, html) {
+    tip.innerHTML = html;
+    tip.classList.add('on');
+    var r = tip.getBoundingClientRect();
+    var x = Math.min(window.innerWidth - r.width - 10, Math.max(10, evt.clientX + 14));
+    var y = Math.max(10, evt.clientY - r.height - 12);
+    tip.style.left = x + 'px';
+    tip.style.top = y + 'px';
+  }
+  function hideTip() { tip.classList.remove('on'); }
+
+  function statLines(region, key) {
+    var w = WINDOWS.filter(function (x) { return x.key === key; })[0];
+    var s = region.windows[key];
+    if (!s) return '<span class="d">' + region.name + ' · ' + w.label + '</span><br>no data';
+    return '<span class="d">' + region.name + ' · ' + s.label + '</span><br>'
+         + '<span class="v">' + s.psi + '</span> ' + s.band + '<br>'
+         + '<span class="d">mean PM2.5</span> ' + s.pm25 + ' µg/m³<br>'
+         + '<span class="d">coverage</span> ' + s.coverage + '%';
+  }
+
+  /* ---------------- highlight linkage ---------------- */
+  var mapWrap = document.getElementById('map-wrap');
+  function highlight(key) {
+    mapWrap.classList.toggle('dim', !!key);
+    Array.prototype.forEach.call(document.querySelectorAll('.rgn'), function (p) {
+      p.classList.toggle('on', p.getAttribute('data-region') === key);
+    });
+    Array.prototype.forEach.call(document.querySelectorAll('.card'), function (c) {
+      c.classList.toggle('on', c.getAttribute('data-region') === key);
+    });
+  }
+
+  /* ---------------- the map ---------------- */
+  var svg = document.getElementById('map');
+  var M = D.map;
+  svg.setAttribute('viewBox', '0 0 ' + M.width + ' ' + M.height);
+
+  function drawMap() {
+    while (svg.firstChild) svg.removeChild(svg.firstChild);
+    svg.appendChild(el('path', { d: M.outline, fill: 'var(--sea)' }));
+
+    var order = ['west', 'north', 'central', 'east', 'south'];
+    order.forEach(function (key) {
+      var geo = M.regions[key];
+      var r = REG[key];
+      if (!geo || !r) return;
+      var s = r.windows[selected];
+      var p = el('path', {
+        d: geo.d,
+        fill: s ? fillFor(s.psi) : 'var(--sea)',
+        class: 'rgn'
+      });
+      p.setAttribute('data-region', key);
+      p.addEventListener('mousemove', function (e) { showTip(e, statLines(r, selected)); });
+      p.addEventListener('mouseenter', function () { highlight(key); });
+      p.addEventListener('mouseleave', function () { highlight(null); hideTip(); });
+      svg.appendChild(p);
+    });
+
+    // Labels last, each on its own plaque: the deepest fills in the ramp are
+    // too dark for ink and too saturated for reversed-out type.
+    order.forEach(function (key) {
+      var geo = M.regions[key];
+      var r = REG[key];
+      if (!geo || !r) return;
+      var s = r.windows[selected];
+      var cx = geo.label[0], cy = geo.label[1];
+      var w = 126, h = 62;
+      var x = Math.max(4, Math.min(M.width - w - 4, cx - w / 2));
+      var y = Math.max(4, Math.min(M.height - h - 4, cy - h / 2));
+      var g = el('g', {});
+      g.style.pointerEvents = 'none';
+      g.appendChild(el('rect', { x: x, y: y, width: w, height: h, rx: 3, class: 'plaque' }));
+      g.appendChild(el('text', { x: x + 11, y: y + 18, class: 'p-name' }, r.name.toUpperCase()));
+      g.appendChild(el('text', { x: x + 11, y: y + 43, class: 'p-val' }, s ? s.psi : '—'));
+      g.appendChild(el('text', { x: x + 11, y: y + 55, class: 'p-band' }, s ? s.band : 'no data'));
+      svg.appendChild(g);
+    });
+
+    var w = WINDOWS.filter(function (x) { return x.key === selected; })[0];
+    document.getElementById('map-title').textContent =
+      'Map of Singapore split into NEA’s five reporting regions, each shaded by its '
+      + w.label + ' PSI: '
+      + D.regions.map(function (r) {
+          var s = r.windows[selected];
+          return r.name + ' ' + (s ? s.psi + ' ' + s.band : 'no data');
+        }).join(', ') + '.';
+    svg.setAttribute('aria-label', document.getElementById('map-title').textContent);
+  }
+
+  /* ---------------- scale legend ---------------- */
+  (function () {
+    var bar = document.getElementById('scale-bar');
+    var ticks = document.getElementById('scale-ticks');
+    BANDS.forEach(function (b) {
+      var sw = document.createElement('span');
+      sw.style.background = fillFor((b.lo + b.hi) / 2);
+      bar.appendChild(sw);
+      var t = document.createElement('span');
+      t.innerHTML = '<b>' + b.lo + (b.hi >= 500 ? '+' : '–' + b.hi) + '</b>' + b.name;
+      ticks.appendChild(t);
+    });
+  })();
+
+  /* ---------------- window selector ---------------- */
+  var segs = document.getElementById('segs');
+  WINDOWS.forEach(function (w) {
+    var b = document.createElement('button');
+    b.className = 'seg';
+    b.type = 'button';
+    b.textContent = w.label;
+    b.setAttribute('aria-pressed', String(w.key === selected));
+    b.addEventListener('click', function () {
+      selected = w.key;
+      history.replaceState(null, '', '#' + selected);
+      Array.prototype.forEach.call(segs.children, function (c, i) {
+        c.setAttribute('aria-pressed', String(WINDOWS[i].key === selected));
+      });
+      Array.prototype.forEach.call(document.querySelectorAll('.step'), function (s) {
+        s.classList.toggle('sel', s.getAttribute('data-key') === selected);
+      });
+      drawMap();
+    });
+    segs.appendChild(b);
+  });
+
+  /* ---------------- sparklines ---------------- */
+  function sparkline(values) {
+    var w = 300, h = 34, pad = 2;
+    var s = el('svg', { viewBox: '0 0 ' + w + ' ' + h, preserveAspectRatio: 'none',
+                        role: 'img', 'aria-hidden': 'true' });
+    if (!values.length) return s;
+    var lo = Math.min.apply(null, values), hi = Math.max.apply(null, values);
+    if (hi - lo < 1) { hi = lo + 1; }
+    var pts = values.map(function (v, i) {
+      return [pad + i * (w - 2 * pad) / Math.max(1, values.length - 1),
+              h - pad - (v - lo) / (hi - lo) * (h - 2 * pad)];
+    });
+    s.appendChild(el('path', {
+      d: 'M' + pts.map(function (p) { return p[0].toFixed(1) + ' ' + p[1].toFixed(1); }).join('L'),
+      fill: 'none', stroke: 'var(--signal)', 'stroke-width': 1.6,
+      'stroke-linejoin': 'round', 'stroke-linecap': 'round',
+      'vector-effect': 'non-scaling-stroke'
+    }));
+    var last = pts[pts.length - 1];
+    s.appendChild(el('circle', { cx: last[0], cy: last[1], r: 3,
+                                 fill: 'var(--signal)', stroke: 'var(--surface)',
+                                 'stroke-width': 2 }));
+    return s;
+  }
+
+  /* ---------------- cards ---------------- */
+  var cards = document.getElementById('cards');
+  D.regions.forEach(function (r) {
+    var card = document.createElement('article');
+    card.className = 'card';
+    card.setAttribute('data-region', r.key);
+
+    var head = document.createElement('div');
+    head.className = 'card-head';
+    var h3 = document.createElement('h3');
+    h3.textContent = r.name;
+    var chip = document.createElement('span');
+    chip.className = 'chip';
+    var now = r.windows['24h'];
+    chip.textContent = now ? now.band + ' at 24 h' : 'no data';
+    if (now) chip.style.background = fillFor(now.psi);
+    head.appendChild(h3);
+    head.appendChild(chip);
+    card.appendChild(head);
+
+    var ladder = document.createElement('div');
+    ladder.className = 'ladder';
+    WINDOWS.forEach(function (w) {
+      var s = r.windows[w.key];
+      var step = document.createElement('div');
+      step.className = 'step' + (w.big ? ' big' : '') + (w.key === selected ? ' sel' : '');
+      step.setAttribute('data-key', w.key);
+
+      var v = document.createElement('span');
+      v.className = 'v';
+      v.textContent = s ? s.psi : '—';
+
+      var track = document.createElement('div');
+      track.className = 'track';
+      var bar = document.createElement('div');
+      bar.className = 'bar';
+      bar.style.height = s ? (100 * s.psi / scaleTop).toFixed(1) + '%' : '0';
+      if (s) bar.style.background = fillFor(s.psi);
+      track.appendChild(bar);
+
+      var lab = document.createElement('span');
+      lab.className = 'w';
+      lab.textContent = w.label;
+
+      step.appendChild(v);
+      step.appendChild(track);
+      step.appendChild(lab);
+      step.addEventListener('mousemove', function (e) { showTip(e, statLines(r, w.key)); });
+      step.addEventListener('mouseleave', hideTip);
+      ladder.appendChild(step);
+    });
+    card.appendChild(ladder);
+
+    var spark = document.createElement('div');
+    spark.className = 'spark';
+    var sh = document.createElement('p');
+    sh.className = 'cap-mono';
+    sh.textContent = '24-hour PSI, last 14 days';
+    spark.appendChild(sh);
+    spark.appendChild(sparkline(r.spark));
+    card.appendChild(spark);
+
+    var foot = document.createElement('p');
+    foot.className = 'card-foot';
+    foot.innerHTML = 'Worst 24-hour PSI in the year: <b>' + r.worst24h + '</b> on '
+                   + r.worst24hAt + ' · <b>' + r.unhealthyHours.toLocaleString()
+                   + ' h</b> above 100';
+    card.appendChild(foot);
+
+    card.addEventListener('mouseenter', function () { highlight(r.key); });
+    card.addEventListener('mouseleave', function () { highlight(null); });
+    cards.appendChild(card);
+  });
+
+  /* ---------------- table view ---------------- */
+  (function () {
+    var row = document.getElementById('thead-row');
+    ['Region'].concat(WINDOWS.map(function (w) { return w.label; }))
+      .concat(['Worst 24h in year', 'Hours > 100'])
+      .forEach(function (label) {
+        var th = document.createElement('th');
+        th.textContent = label;
+        th.scope = 'col';
+        row.appendChild(th);
+      });
+
+    var body = document.getElementById('tbl');
+    D.regions.forEach(function (r) {
+      var tr = document.createElement('tr');
+      var th = document.createElement('td');
+      th.textContent = r.name;
+      tr.appendChild(th);
+      WINDOWS.forEach(function (w) {
+        var s = r.windows[w.key];
+        var td = document.createElement('td');
+        if (s) {
+          var sw = document.createElement('span');
+          sw.className = 'sw';
+          sw.style.background = fillFor(s.psi);
+          td.appendChild(sw);
+          td.appendChild(document.createTextNode(s.psi + ' ' + s.band));
+        } else {
+          td.textContent = '—';
+        }
+        tr.appendChild(td);
+      });
+      [r.worst24h + ' (' + r.worst24hAt + ')', r.unhealthyHours.toLocaleString()]
+        .forEach(function (t) {
+          var td = document.createElement('td');
+          td.textContent = t;
+          tr.appendChild(td);
+        });
+      body.appendChild(tr);
+    });
+  })();
+
+  drawMap();
+})();
+</script>

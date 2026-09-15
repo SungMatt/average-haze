@@ -10,12 +10,17 @@ from datetime import date, timedelta
 
 from .fetch import CACHE_DIR, fetch_range
 from .psi import psi_band
+from .regions import CARD_WINDOWS, summarise_all
 from .rolling import analyse, parse_rows, rolling_24h_psi
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 TEMPLATE = os.path.join(ROOT, "template.html")
 PAGE = os.path.join(ROOT, "haze-report.html")
 DATA = os.path.join(ROOT, "data", "chart.json")
+
+MAP_TEMPLATE = os.path.join(ROOT, "map-template.html")
+MAP_PAGE = os.path.join(ROOT, "regions.html")
+MAP_GEOMETRY = os.path.join(ROOT, "data", "map.json")
 
 # Today's cache entry is written while the day is still incomplete, and
 # yesterday's can be missing its final hours, so both are always refetched.
@@ -91,6 +96,36 @@ def build_payload(series):
     }
 
 
+def build_map_payload(rows, end):
+    """Per-region card ladders plus the committed region geometry."""
+    regions = summarise_all(rows)
+    if not regions:
+        raise SystemExit("no regional readings")
+
+    with open(MAP_GEOMETRY) as fh:
+        geometry = json.load(fh)
+
+    ranked = sorted(regions, key=lambda r: r["windows"]["24h"]["psi"], reverse=True)
+    return {
+        "generated": end.strftime("%d %b %Y, %H:%M"),
+        "map": geometry,
+        "regions": regions,
+        "windows": [{"key": key, "label": label, "hours": hours, "big": big}
+                    for key, label, hours, big in CARD_WINDOWS],
+        "worst": ranked[0]["name"],
+        "cleanest": ranked[-1]["name"],
+        "spread24h": ranked[0]["windows"]["24h"]["psi"] - ranked[-1]["windows"]["24h"]["psi"],
+    }
+
+
+def render(template_path, out_path, payload):
+    template = open(template_path).read()
+    if "__DATA__" not in template:
+        raise SystemExit("%s is missing its __DATA__ placeholder" % template_path)
+    with open(out_path, "w") as fh:
+        fh.write(template.replace("__DATA__", json.dumps(payload)))
+
+
 def main():
     today = date.today()
     drop_stale_cache(today)
@@ -103,12 +138,10 @@ def main():
     payload = build_payload(series)
     with open(DATA, "w") as fh:
         json.dump(payload, fh)
+    render(TEMPLATE, PAGE, payload)
 
-    template = open(TEMPLATE).read()
-    if "__DATA__" not in template:
-        raise SystemExit("template.html is missing its __DATA__ placeholder")
-    with open(PAGE, "w") as fh:
-        fh.write(template.replace("__DATA__", json.dumps(payload)))
+    map_payload = build_map_payload(rows, series[-1][0])
+    render(MAP_TEMPLATE, MAP_PAGE, map_payload)
 
     current = payload["windows"][0]
     print("latest reading   : %s" % payload["generated"])
@@ -116,7 +149,11 @@ def main():
     print("365-day PSI      : %d" % payload["windows"][-1]["psi"])
     print("cache            : %d days (%d pruned)"
           % (len(os.listdir(CACHE_DIR)), pruned))
+    print("worst region     : %s (24h PSI %d)"
+          % (map_payload["worst"],
+             max(r["windows"]["24h"]["psi"] for r in map_payload["regions"])))
     print("rebuilt          : %s" % PAGE)
+    print("                 : %s" % MAP_PAGE)
 
 
 if __name__ == "__main__":

@@ -4,6 +4,7 @@ import unittest
 from datetime import datetime, timedelta
 
 from haze.psi import PM25_BREAKPOINTS, pm25_to_psi, psi_band, psi_to_pm25
+from haze.regions import CARD_WINDOWS, summarise_all, summarise_region
 from haze.rolling import parse_rows, rolling_24h_psi, summarise
 
 
@@ -118,3 +119,103 @@ class TestRolling(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
+
+
+class TestRegions(unittest.TestCase):
+    """The per-region ladder, on a synthetic year with one region hazed."""
+
+    def setUp(self):
+        start = datetime(2026, 1, 1, 0, 0)
+        # 400 days of hourly rows. Every region sits at 20 ug/m3 except
+        # central, which spends the final 48 hours at 120.
+        self.rows = []
+        total = 24 * 400
+        for i in range(total):
+            when = start + timedelta(hours=i)
+            values = {r: 20 for r in ("north", "south", "east", "west", "central")}
+            if i >= total - 48:
+                values["central"] = 120
+            self.rows.append((when.isoformat(), values))
+        self.end = start + timedelta(hours=total - 1)
+
+    def test_every_card_window_is_present(self):
+        card = summarise_region(self.rows, "north", self.end)
+        self.assertEqual(sorted(card["windows"]), sorted(k for k, _, _, _ in CARD_WINDOWS))
+
+    def test_one_hour_window_is_the_latest_reading(self):
+        card = summarise_region(self.rows, "central", self.end)
+        one = card["windows"]["1h"]
+        self.assertEqual(one["readings"], 1)
+        self.assertAlmostEqual(one["pm25"], 120.0)
+        self.assertEqual(one["psi"], round(pm25_to_psi(120)))
+
+    def test_quiet_region_reads_the_same_on_every_window(self):
+        card = summarise_region(self.rows, "west", self.end)
+        psis = {w["psi"] for w in card["windows"].values()}
+        self.assertEqual(psis, {round(pm25_to_psi(20))})
+
+    def test_the_ladder_falls_as_the_window_widens(self):
+        """The point of the page: a 48-hour episode shrinks with the window."""
+        card = summarise_region(self.rows, "central", self.end)
+        order = [card["windows"][key]["psi"] for key, _, _, _ in CARD_WINDOWS]
+        # CARD_WINDOWS runs 365d -> 1h, so the numbers must rise along it.
+        self.assertEqual(order, sorted(order))
+        self.assertGreater(card["windows"]["1h"]["psi"], card["windows"]["365d"]["psi"])
+
+    def test_regions_are_independent(self):
+        cards = {c["key"]: c for c in summarise_all(self.rows)}
+        self.assertEqual(len(cards), 5)
+        self.assertGreater(cards["central"]["windows"]["24h"]["psi"],
+                           cards["east"]["windows"]["24h"]["psi"])
+
+    def test_all_regions_share_one_end_instant(self):
+        cards = summarise_all(self.rows)
+        self.assertEqual({c["windows"]["365d"]["readings"] for c in cards}, {24 * 365})
+
+
+class TestMapGeometry(unittest.TestCase):
+    """The committed Voronoi partition must actually partition the island."""
+
+    @classmethod
+    def setUpClass(cls):
+        import json
+        import os
+        here = os.path.dirname(os.path.abspath(__file__))
+        with open(os.path.join(here, "data", "map.json")) as fh:
+            cls.geo = json.load(fh)
+
+    def test_every_region_has_geometry(self):
+        for region in ("north", "south", "east", "west", "central"):
+            self.assertIn(region, self.geo["regions"])
+            self.assertTrue(self.geo["regions"][region]["d"].startswith("M"))
+
+    def test_labels_sit_inside_the_viewbox(self):
+        for region, shape in self.geo["regions"].items():
+            x, y = shape["label"]
+            self.assertTrue(0 <= x <= self.geo["width"], region)
+            self.assertTrue(0 <= y <= self.geo["height"], region)
+
+    def test_region_areas_sum_to_the_coastline(self):
+        """Voronoi cells tile the island: no gaps, no double-counting."""
+        import re
+
+        def area(path):
+            total = 0.0
+            for sub in path.split("Z"):
+                pts = [tuple(map(float, p.split()))
+                       for p in re.findall(r"(-?\d+\.?\d* -?\d+\.?\d*)", sub)]
+                if len(pts) < 3:
+                    continue
+                acc = 0.0
+                for (x1, y1), (x2, y2) in zip(pts, pts[1:] + pts[:1]):
+                    acc += x1 * y2 - x2 * y1
+                total += abs(acc) / 2
+            return total
+
+        whole = area(self.geo["outline"])
+        parts = sum(area(s["d"]) for s in self.geo["regions"].values())
+        self.assertAlmostEqual(parts / whole, 1.0, places=2)
+
+
+if __name__ == "__main__":
+    unittest.main()
